@@ -17,7 +17,7 @@ method = 'EN' #information gain (entropy)
 #method = 'GI'#gini-index
 
 #maximum tree depth
-maxdepth = 2
+maxdepth = 6
 
 S = []
 Label = ['unacc', 'acc', 'good', 'vgood']
@@ -54,6 +54,7 @@ class Node():
         self.num_branches = num_branches
         self.infogain = infogain
         self.children = children
+
         
         #for leaf node:
         self.value = value
@@ -90,6 +91,29 @@ class Tree():
         ent = sum(entropy)
         return(ent)
     
+    def majority_error(self,S):
+        Sy = S['label']
+        #print(Sy)
+        label_counts = Sy.value_counts()
+        majority_class_count = label_counts.max()
+        #print(label_counts)
+        #print(majority_class_count)
+        majority_error = 1-(majority_class_count/len(Sy))
+        #print('majority error ')
+        #print(majority_error)
+        return majority_error
+    
+    def gini_index(self,S):
+        Sy = S['label']
+        print(Sy)
+        label_counts = Sy.value_counts()
+        print(label_counts)
+        sum = 0
+        for count in label_counts:
+            sum += (count/len(S))**2
+        gini_idx = 1-sum
+        return gini_idx
+    
     #caculates "information gain" depending on requested method
     def info_gain(self,df,col,Attributes,Method):
         #print(df)
@@ -107,12 +131,33 @@ class Tree():
                 #print(sum)
             infogain = self.entropy(Sv)-sum
             return(infogain)
+        
+        if Method == 'ME':
+            sum = 0;
+            #print(Attributes[col])
+            for v in Attributes[col]:
+                e = Sv.loc[Sv[col] == v]
+                #print('v:',v)
+                #print('e: ',e)
+                sum = sum+(len(e)/len(df))*self.majority_error(e)
+                #print('current sum: ')
+                #print(sum)
+            #print(self.majority_error(Sv))
+            majorityerror = self.majority_error(Sv)-sum
+            #print(majorityerror)
+            return(majorityerror)
+        
+        if Method == 'GI':
+            gini_index = self.gini_index(Sv)
+            return(gini_index)
             
     #find indeces of all rows in main dataframe given an attribute and value, return
     #a list of index sets for each value the attribute can take, and a new list of 
     #attributes with that one removed
     def split(self,df,col,cols,A):
         Sv = []
+        #print('col: ',col)
+        #print(A[col])
         for v in A[col]:
             Svi = df.index[df[col]==v]
             Sv.append(Svi)
@@ -131,16 +176,18 @@ class Tree():
     def build_tree(self,df,A,Attributes,Label,current_depth,Method):
             
         if current_depth >= maxdepth or self.is_unique(df['label']) or A == []:
-            val = df.label.mode().to_list()
+            val = df.label.mode()[0]
             return Node(value=val)
         else:
-            maxgain = float(0)
+            maxgain = -1
             splitter = None
             for Att in A:
-                print('A: ',A)
+                #print('A: ',A)
                 #print('Att: ',Att)
                 i = self.info_gain(df, Att, Attributes, Method)
-                print('i: ',i)
+                #if Method = 'EN':
+                #print('i: ',i)
+                #print('maxgain: ',maxgain)
                 if i > maxgain:
                     maxgain = i
                     splitter = Att
@@ -149,62 +196,61 @@ class Tree():
             #print('Svi: ',Svi)
             
             children = []
-            for i in Svi:
+            for i,idx in enumerate(Svi):
                 #print(df.loc[i])
-                child = self.build_tree(df.loc[i],remaining_cols, Attributes, Label, current_depth+1,method)
-                children.append(child)
+                #print(Attributes[splitter])
+                if idx.empty:
+                    val = df['label'].mode()[0]  # Handle empty subsets
+                    child = Node(value=val)
+                else:
+                    child = self.build_tree(df.loc[idx],remaining_cols, Attributes, Label, current_depth+1,method)
+                    children.append(child)
                 
             return Node(splitter,len(Svi),maxgain,None,children)
-
-# Function to count the total number of leaf nodes in the tree
-def count_leaf_nodes(node):
-    if node.value is not None:  # It's a leaf node
-        return 1
-    return sum(count_leaf_nodes(child) for child in node.children)
-
-# Function to plot the decision tree
-def plot_tree(node, x=0.5, y=1.0, x_offset=1, y_offset=0.1, ax=None, parent_pos=None):
-    if ax is None:
-        # Initialize the plot
-        fig, ax = plt.subplots(figsize=(12, 8))
-        ax.set_axis_off()
-
-    # Plot current node
-    if node.value is not None:
-        # Leaf node
-        label = f'Leaf: {node.value}'
-    else:
-        # Decision node
-        label = f'{node.attributesplit}\nInfo Gain: {round(node.infogain, 3)}'
-
-    ax.text(x, y, label, ha='center', va='center', bbox=dict(boxstyle='round,pad=0.3', facecolor='lightblue', edgecolor='black'))
-
-    if parent_pos:
-        # Draw an edge from the parent node to the current node
-        ax.plot([parent_pos[0], x], [parent_pos[1], y], 'k-', lw=1)
-
-    if node.children:
-        num_leaf_nodes = count_leaf_nodes(node)  # Count total leaf nodes under this node
-        step = x_offset / (num_leaf_nodes - 1) if num_leaf_nodes > 1 else 0
-
-        child_x = x - x_offset / 2  # Start the children on the left
-        for idx, child in enumerate(node.children):
-            # Recursively plot children
-            new_x = child_x + step * count_leaf_nodes(child) / 2
-            plot_tree(child, x=new_x, y=y - y_offset, x_offset=x_offset / 2, y_offset=y_offset, ax=ax, parent_pos=(x, y))
-            child_x += step * count_leaf_nodes(child)
-
-    return ax
+    
+    #predict value of a given row recursively
+    def predict(self,node,row):
+        if node.value != None:
+            #print(node.value)
+            return node.value
         
+        #datapoint value for attribute that his node decides on
+        value = row[node.attributesplit]
+        attribute_vals = self.Attributes[node.attributesplit]
+        
+        
+        for i, child in enumerate(node.children):
+            #rint('Attributes[node.attributesplit][i]: ',Attributes[node.attributesplit][i])
+            #print('value: ',value)
+            if value == attribute_vals[i]:
+                return self.predict(child,row)
+    
+    #calculate prediction errror over a given dataset
+    def calc_error(self,tree,df):
+        incorrect_predictions = 0
+        total_samples = len(df)
+        
+        # iterate over each row in the dataframe
+        for idx, row in df.iterrows():
+            actual_label = row['label']
+            #print('actual: ',actual_label)
+            predicted_label = self.predict(tree, row)
+            #print('prediction: ',predicted_label)
+
+            if predicted_label != actual_label:
+                incorrect_predictions += 1
+
+        # Calculate and return the training error as a fraction of misclassified samples
+        training_error = incorrect_predictions / total_samples
+        #print(incorrect_predictions)
+        return training_error
+            
+
+
+        
+#gini_index(df)
 mytree = Tree((maxdepth), Attributes, Label)
 a = mytree.build_tree(df, A, Attributes, Label, 0, method)
-# Example usage with your tree structure
-ax = plot_tree(a)  # 'a' is the root node of the tree created by build_tree()
 
-# Display the tree
-plt.show()
-#a = a.to_list()
-#print(a.value)
-#Sv, remaining_cols = split(df,cols[5],A,Attributes)
-#info_gain(df,cols[5],Attributes['safety'],'EN')
-#e = df.loc[df[cols[5]] == 'low']
+error = mytree.calc_error(a,df)
+print('trainingerror = ',error)
