@@ -15,58 +15,102 @@ method = 'EN' #information gain (entropy)
 #method = 'GI'#gini-index
 
 #maximum tree depth
-maxdepth = 6
+maxdepth = 16
 
 S = []
 Label = ['unacc', 'acc', 'good', 'vgood']
-Attributes = {}
 A =[]
+cols = []
 
 
-#load data description
-with open('car/data-desc.txt', 'r') as g:
-    for line in g:
-        if ':' in line:
-            attribute, vals = line.split(':')
-            attribute = attribute.strip()
-            vals = vals.strip().strip('.').split(',')
-            for i, val in enumerate(vals):
-                val = val.strip()
-                vals[i] = val
-            Attributes[attribute] = vals
-            A.append(attribute)
+#input data description
+Attributes = {'age':'numeric',
+              'job': ["admin.","unknown","unemployed","management","housemaid","entrepreneur","student","blue-collar","self-employed","retired","technician","services" ],
+              'marital':["married","divorced","single"],
+              'education': ["unknown","secondary","primary","tertiary"],
+              'default': ["yes","no"],
+              'balance':'numeric',
+              'housing': ["yes","no"],
+              'loan': ["yes","no"],
+              'contact': ["unknown","telephone","cellular"],
+              'day': 'numeric',
+              'month': ["jan", "feb", "mar","apr","may","jun","jul","aug","sep","oct", "nov", "dec"],
+              'duration':'numeric',
+              'campaign': 'numeric',
+              'pdays': 'numeric',
+              'previous':'numeric',
+              'poutcome': ["unknown","other","failure","success"],
+              'label': ["yes", "no"]
+    }
 
-cols = [At for At in Attributes]
-cols.append('label')
+for Att in Attributes:
+    cols.append(Att)
+A = cols[0:-1]
 
-df = pd.read_csv('car/train.csv',names=cols)
-dftest = pd.read_csv('car/test.csv',names=cols)
+    
+df = pd.read_csv('bank/train.csv',names=cols)
+
+#replace unknown values with the most common known value in that category
+for col in df:
+    #print(col)
+    #print(Attributes[col])
+    if "unknown" in Attributes[col]:
+        #print(df[col])
+        known_col = df[col].loc[df[col] != "unknown"]
+        #print(known_col)
+        counts = known_col.value_counts()
+        majority_idx = counts.idxmax()
+        #print('majority_idx: ',majority_idx)
+        df.replace({col:"unknown"},majority_idx,inplace=True)
+        #print(df[col])
+        
+#print(df)
+dftest = pd.read_csv('bank/test.csv',names=cols)
+
+for col in dftest:
+    #print(col)
+    #print(Attributes[col])
+    if "unknown" in Attributes[col]:
+        #print(df[col])
+        known_col = dftest[col].loc[dftest[col] != "unknown"]
+        #print(known_col)
+        counts = known_col.value_counts()
+        majority_idx = counts.idxmax()
+        #print('majority_idx: ',majority_idx)
+        dftest.replace({col:"unknown"},majority_idx,inplace=True)
+
+
+for Att in Attributes:
+    if "unknown" in Attributes[Att]:
+        Attributes[Att].remove("unknown")
 #print(df)
 #X = df.drop(columns=['label'])
 
 #make a Node class
 class Node():
-    def __init__(self,attributesplit=None,num_branches=None,infogain=None,value=None,children=None):
+    def __init__(self,attributesplit=None,num_branches=None,infogain=None,value=None,children=None,divider=None):
         
         #for decision node:
         self.attributesplit = attributesplit
         self.num_branches = num_branches
         self.infogain = infogain
         self.children = children
-
+        
+        #for numerical category
+        self.divider = divider
         
         #for leaf node:
         self.value = value
         
 #make a tree class
 class Tree():
-    def __init__(self, maxdepth,Attributes,Label):
+    def __init__(self, depth,Attributes,Label):
         
         #initialize root node
         self.root = None
         
         #stopping condition
-        self.maxdepth = maxdepth
+        self.maxdepth = depth
         
         self.Attributes = Attributes
         self.Label = Label
@@ -117,30 +161,53 @@ class Tree():
     def info_gain(self,df,col,Attributes,Method):
         #print(df)
         #print('col: ',col)
+        num = 0
         Sv = df[[col, 'label']]
+        if Attributes[col] == 'numeric':
+            num = 1
+            median = Sv[col].median()
+            #print(median)
+            df['numeric'] = np.where(df[col] > median,True, False)
+            #Svnum = pd.DataFrame(data=compare_median,columns=col)
+            #Svnum = [compare_median, Sv['label']]
+            #print(df)
+            Sv = df[['numeric', 'label']]
         #print('Sv: ',Sv)
         if Method == 'EN':
             sum = 0;
-            for v in Attributes[col]:
-                e = Sv.loc[Sv[col] == v]
-                #print('v:',v)
-                #print('e: ',e)
-                sum = sum+(len(e)/len(df))*self.entropy(e)
-                #print('current sum: ')
-                #print(sum)
+            if num == 1:
+                for j in [True, False]:
+                    e = Sv.loc[Sv['numeric'] == j]
+                    sum = sum+(len(e)/len(df))*self.entropy(e)
+            else:
+                for v in Attributes[col]:
+                    e = Sv.loc[Sv[col] == v]
+                    #print('v:',v)
+                    #print('e: ',e)
+                    sum = sum+(len(e)/len(df))*self.entropy(e)
+                    #print('current sum: ')
+                    #print(sum)
             infogain = self.entropy(Sv)-sum
+            #print(infogain)
             return(infogain)
         
         if Method == 'ME':
             sum = 0;
             #print(Attributes[col])
-            for v in Attributes[col]:
-                e = Sv.loc[Sv[col] == v]
-                #print('v:',v)
-                #print('e: ',e)
-                sum = sum+(len(e)/len(df))*self.majority_error(e)
-                #print('current sum: ')
-                #print(sum)
+            if num == 1:
+                for j in [True, False]:
+                    e = Sv.loc[Sv['numeric'] == j]
+                    if len(e) != 0:
+                        sum  = sum+(len(e)/len(df))*self.majority_error(e)
+            else:
+                for v in Attributes[col]:
+                    e = Sv.loc[Sv[col] == v]
+                    #print('v:',v)
+                    #print('e: ',e)
+                    if len(e) != 0:
+                        sum = sum+(len(e)/len(df))*self.majority_error(e)
+                    #print('current sum: ')
+                    #print(sum)
             #print(self.majority_error(Sv))
             majorityerror = self.majority_error(Sv)-sum
             #print(majorityerror)
@@ -155,12 +222,28 @@ class Tree():
     #attributes with that one removed
     def split(self,df,col,cols,A):
         Sv = []
+        num = 0
+        if Attributes[col] == 'numeric':
+            num = 1
+            #print(col)
+            median = df[col].median()
+            #print(median)
+            df['numeric'] = np.where(df[col] > median,True, False)
+            #Svnum = pd.DataFrame(data=compare_median,columns=col)
+            #Svnum = [compare_median, Sv['label']]
+            #print(df)
+            #Sv = df[['numeric', 'label']]
         #print('col: ',col)
         #print(A[col])
-        for v in A[col]:
-            Svi = df.index[df[col]==v]
-            Sv.append(Svi)
-            #Sv = df.loc[Svi]
+        if num == 1:
+            for j in [True, False]:
+                Svi = df.index[df['numeric'] == j]
+                Sv.append(Svi)
+        else:
+            for v in A[col]:
+                Svi = df.index[df[col]==v]
+                Sv.append(Svi)
+                #Sv = df.loc[Svi]
         cols.remove(col)
         #print(cols)
         return(Sv,cols)
@@ -180,11 +263,12 @@ class Tree():
         else:
             maxgain = -1
             splitter = None
+            #print(A)
             for Att in A:
+                #print(Att)
                 #print('A: ',A)
                 #print('Att: ',Att)
                 i = self.info_gain(df, Att, Attributes, Method)
-                #if Method = 'EN':
                 #print('i: ',i)
                 #print('maxgain: ',maxgain)
                 if i > maxgain:
@@ -204,8 +288,11 @@ class Tree():
                 else:
                     child = self.build_tree(df.loc[idx],remaining_cols, Attributes, Label, current_depth+1,method)
                     children.append(child)
-                
-            return Node(splitter,len(Svi),maxgain,None,children)
+            if Attributes[splitter] == 'numeric':
+                median = df[splitter].median()
+                return Node(splitter,len(Svi),maxgain,None,children,median)
+            else:
+                return Node(splitter,len(Svi),maxgain,None,children)
     
     #predict value of a given row recursively
     def predict(self,node,row):
@@ -219,10 +306,16 @@ class Tree():
         
         
         for i, child in enumerate(node.children):
-            #rint('Attributes[node.attributesplit][i]: ',Attributes[node.attributesplit][i])
+            #print('attribute_vals: ',attribute_vals)
             #print('value: ',value)
-            if value == attribute_vals[i]:
-                return self.predict(child,row)
+            if attribute_vals == 'numeric':
+                if i == 0 and value>node.divider:
+                    return self.predict(child, row)
+                else:
+                    return self.predict(child, row)
+            else:
+                if value == attribute_vals[i]:
+                    return self.predict(child,row)
     
     #calculate prediction errror over a given dataset
     def calc_error(self,tree,df):
@@ -243,18 +336,23 @@ class Tree():
         training_error = incorrect_predictions / total_samples
         #print(incorrect_predictions)
         return training_error
-            
-
 
         
 #gini_index(df)
 #avg_error = []
 #for depth in range(maxdepth):
 mytree = Tree(maxdepth, Attributes, Label)
-a = mytree.build_tree(dftest, A, Attributes, Label, 0, method)
+a = mytree.build_tree(df, A, Attributes, Label, 0, method)
     
 error = mytree.calc_error(a,dftest)
-print(error)
+#print('prediction error: ',error,' depth = ',maxdepth)
+results = {'data':['test'], 'method': [method], 'maxdepth': [maxdepth],'prediction error': [error]}
+#labels = ['data', 'method', 'maxdepth','prediction error']
+
+df_results = pd.DataFrame.from_dict(data = results)
+print(df_results)
+
+df_results.to_csv('bank/results_replace_unkowns.csv', mode='a', header=False)
     #avg_error.append(error)
     #print('trainingerror = ',error,', depth = ',depth)
 #avg = sum(avg_error)/len(avg_error)
