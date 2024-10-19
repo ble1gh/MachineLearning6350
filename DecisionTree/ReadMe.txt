@@ -1,0 +1,1 @@
+Use ID3.py for problem 2 in part 2, and ID3_numerical_support.py for problem 3 in part 2. In the first couple lines of both scripts you have the options to choose the splitting method by choosing which “method = …” lines are commented out, as well as setting the maximum tree depth by choosing maxdepth.
