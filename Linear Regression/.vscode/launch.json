@@ -1,0 +1,11 @@
+{
+    "configurations": [
+        {
+            "type": "debugpy",
+            "request": "launch",
+            "name": "Launch batch_gradient_descent.py",
+            "program": "${workspaceFolder}/batch_gradient_descent.py",
+            "console": "integratedTerminal"
+        }
+    ]
+}
