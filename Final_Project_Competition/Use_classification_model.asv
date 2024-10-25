@@ -1,0 +1,7 @@
+filename2 = 'test_final_labelled.csv';
+test_tbl = readtable(filename2);
+
+[yfit,scores] = trainedModel.predictFcn(test_tbl);
+%%
+idx = 1:length(yfit);
+output = [idx]
