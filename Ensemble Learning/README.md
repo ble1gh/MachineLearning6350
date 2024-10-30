@@ -1,1 +1,1 @@
-In this folder, the scripts are named for what they are. You should be able to just open and run them.
+In this folder, the scripts are named for what they are. You should be able to just open and run them, otherwise change the location of the test and training data to be correct on the machine running the code.
