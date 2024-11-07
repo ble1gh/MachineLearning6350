@@ -90,7 +90,7 @@ TValidation = onehotencode(tblValidation.label,2);
 %%
 %Define NN architecture
 numFeatures = size(XTrain,2);
-hiddenSize = 3;
+hiddenSize = 105;
 numClasses = 2;
  
 layers = [
