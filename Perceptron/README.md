@@ -1,0 +1,1 @@
+The shell script "HW3_shell.sh" will run all three homework problems. Close each plot that shows after examining to keep running the program. All 3 individual scripts will likely need the data location to be changed. The training and test data locations are set as string variables at the top of each script.
