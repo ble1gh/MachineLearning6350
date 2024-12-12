@@ -1,0 +1,1 @@
+See 'SVM_primal_stochastic_subgradient.py' for part 2 Q2, 'SVM_dual.py' for Q3a, and 'SVM_dual_gaus_kernel.py' for Q3b and c. Hyperparameters are set as global variables at the top of each script. The file source location will need to be changed to it's local location to run this code on the CADE machines. 
