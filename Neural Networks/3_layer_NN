@@ -1,0 +1,68 @@
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Load the data
+df = pd.read_csv('bank-note/train.csv')
+df_test = pd.read_csv('bank-note/test.csv')
+X = df.iloc[:, :-1].values
+y = df.iloc[:, -1].values
+X_test = df_test.iloc[:, :-1].values
+y_test = df_test.iloc[:, -1].values
+
+class NN:
+    def __init__(self, hidden_layers, width, learning_rate_schedule):
+        self.hidden_layers = hidden_layers
+        self.width = width
+        self.learning_rate_schedule = learning_rate_schedule
+    
+    def sigmoid(self, x):
+        return 1 / (1 + np.exp(-x))
+    
+    def sigmoid_derivative(self, x):
+        return self.sigmoid(x) * (1 - self.sigmoid(x))
+    
+    def forward_pass(self, X, weights):
+        
+        # Forward pass
+        z = np.zeros([self.hidden_layers+1, self.width])
+        a = np.zeros([self.hidden_layers+1, self.width])
+
+        z[0] = np.insert(X, 0, 1)
+     
+        for i in range(1,self.hidden_layers+1):
+            z[i][0] = 1
+            for j in range(0,self.width-1):
+                a[i][j+1] = np.dot(z[i-1], weights[i-1][j])
+                z[i][j+1] = self.sigmoid(a[i][j+1])
+        
+        y = np.dot(z[self.hidden_layers], weights[self.hidden_layers][0])
+
+        return z,a,y
+    
+    def backward_pass(self, X, y, weights, z, a):
+        
+        # Backward pass
+        delta = np.zeros([self.hidden_layers+1,self.width-1, self.width])
+        delta[self.hidden_layers][0] = y - X[1]
+        
+        for i in range(self.hidden_layers, 0, -1):
+            for j in range(1,self.width):
+                delta[i][j] = np.dot(delta[i+1], weights[i][j]) * self.sigmoid_derivative(a[i][j])
+        
+        return delta
+
+    
+
+weights = np.array([[[-1,-2,-3], [1,2,3]],[[-1,-2,-3], [1,2,3]],[[-1,2,-1.5], [0,0,0]]])
+
+X = np.array([1,1])
+myNN = NN(2, 3, 0.1)
+
+z,a,y = myNN.forward_pass(X, weights)
+print('z: ',z)
+print('y: ',y)
+
+delta = myNN.backward_pass(X, y, weights, z, a)
+print('delta: ',delta)
